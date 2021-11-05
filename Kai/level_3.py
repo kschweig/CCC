@@ -29,7 +29,7 @@ class CNN(nn.Module):
         self.bn3 = nn.BatchNorm2d(24)
         self.bn4 = nn.BatchNorm2d(32)
         self.act = nn.ReLU()
-        self.hidden = nn.Linear(32 * 2 * 16, 256)
+        self.hidden = nn.Linear(32 * 2 * 44, 256)
         self.out = nn.Linear(256, 1)
 
     def forward(self, x):
@@ -44,7 +44,7 @@ class CNN(nn.Module):
         x = self.drop(self.act(self.bn4(self.conv4(x))))
         x = torch.flatten(x, start_dim=1)
         x = self.act(self.hidden(x))
-        return torch.sigmoid(self.out(x)).squeeze(1)
+        return self.out(x).squeeze(1)
 
 
 class MyDS(torch.utils.data.Dataset):
@@ -93,13 +93,6 @@ def update(network: nn.Module, data: DataLoader, loss: nn.Module,
 
     return errs
 
-def accuracy(y_hat, y):
-    y_hat = y_hat.detach().numpy()
-    y = y.detach().numpy()
-
-    y_hat = [1. if y_ > 0.5 else 0. for y_ in y_hat]
-    return accuracy_score(y, y_hat)
-
 
 images = []
 targets = []
@@ -112,7 +105,7 @@ with open(os.path.join("data", f"train.csv"), "r") as f:
         elif l <= N:
             images.append([int(s) for s in line.split(",")])
         else:
-            targets.append(int(line))
+            targets.append(float(line))
 
 images = np.asarray(images)
 print(N, images.shape, len(targets))
@@ -131,14 +124,14 @@ epochs = 30
 
 model = CNN()
 optimizer = optim.Adam(params=model.parameters(), lr=lr, weight_decay=0)
-loss = nn.BCELoss()
+loss = nn.MSELoss()
 
 train_loader = DataLoader(MyDS(xtrain, ytrain), batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(MyDS(xtest, ytest), batch_size=len(xtest), shuffle=False)
 
 for ep in range(epochs):
     print("loss:", np.mean(update(network=model, data=train_loader, loss=loss, opt=optimizer)))
-    print("acc:", evaluate(network=model, data=test_loader, metric=accuracy))
+    print("acc:", evaluate(network=model, data=test_loader, metric=loss))
 
 for c in range(1, 3):
 
@@ -147,7 +140,7 @@ for c in range(1, 3):
     preds = []
     images = []
 
-    with open(os.path.join("data", f"level_2_{c}.csv"), "r") as f:
+    with open(os.path.join("data", f"level_3_{c}.in"), "r") as f:
 
         for l, line in enumerate(f):
             if l == 0:
@@ -161,12 +154,9 @@ for c in range(1, 3):
 
     for image in images:
         pred = model.forward(torch.FloatTensor(image.reshape(1,1,28, -1)))
-        if pred > 0.5:
-            preds.append(1)
-        else:
-            preds.append(0)
+        preds.append(pred.numpy())
 
 
     with open(os.path.join("results", f"level_2_{c}.csv"), "w") as f:
         for r in preds:
-            f.write(f"{int(r)}\n")
+            f.write(f"{float(r)}\n")
