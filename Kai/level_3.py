@@ -29,7 +29,8 @@ class CNN(nn.Module):
         self.bn3 = nn.BatchNorm2d(24)
         self.bn4 = nn.BatchNorm2d(32)
         self.act = nn.ReLU()
-        self.hidden = nn.Linear(32 * 2 * 44, 256)
+        self.hidden = nn.Linear(32 * 2 * 44, 1024)
+        self.hidden2 = nn.Linear(1024, 256)
         self.out = nn.Linear(256, 1)
 
     def forward(self, x):
@@ -43,7 +44,8 @@ class CNN(nn.Module):
         x = self.drop(self.act(self.bn3(self.conv3(x))))
         x = self.drop(self.act(self.bn4(self.conv4(x))))
         x = torch.flatten(x, start_dim=1)
-        x = self.act(self.hidden(x))
+        x = self.drop(self.act(self.hidden(x)))
+        x = self.drop(self.act(self.hidden2(x)))
         return self.out(x).squeeze(1)
 
 
@@ -119,7 +121,7 @@ xtrain, xtest, ytrain, ytest = train_test_split(images, targets, test_size=0.05,
 
 lr = 1e-3
 batch_size = 64
-epochs = 30
+epochs = 15
 
 
 model = CNN()
@@ -133,30 +135,29 @@ for ep in range(epochs):
     print("loss:", np.mean(update(network=model, data=train_loader, loss=loss, opt=optimizer)))
     print("acc:", evaluate(network=model, data=test_loader, metric=loss))
 
-for c in range(1, 3):
 
-    model.eval()
+model.eval()
 
-    preds = []
-    images = []
+preds = []
+images = []
 
-    with open(os.path.join("data", f"level_3_{c}.in"), "r") as f:
+with open(os.path.join("data", f"level_3_1.in"), "r") as f:
 
-        for l, line in enumerate(f):
-            if l == 0:
-                N = int(line)
-                print(N)
-            else:
-                images.append([int(s) for s in line.split(",")])
+    for l, line in enumerate(f):
+        if l == 0:
+            N = int(line)
+            print(N)
+        else:
+            images.append([int(s) for s in line.split(",")])
 
-    images = np.asarray(images)
-    images = images / norm
+images = np.asarray(images)
+images = images / norm
 
-    for image in images:
-        pred = model.forward(torch.FloatTensor(image.reshape(1,1,28, -1)))
-        preds.append(pred.numpy())
+for image in images:
+    pred = model.forward(torch.FloatTensor(image.reshape(1,1,28, -1)))
+    preds.append(pred.detach().numpy())
 
 
-    with open(os.path.join("results", f"level_2_{c}.csv"), "w") as f:
-        for r in preds:
-            f.write(f"{float(r)}\n")
+with open(os.path.join("results", f"level_3_1.csv"), "w") as f:
+    for r in preds:
+        f.write(f"{float(r)}\n")
